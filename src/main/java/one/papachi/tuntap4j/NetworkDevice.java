@@ -6,7 +6,8 @@ import java.nio.ByteBuffer;
 public abstract class NetworkDevice {
 
     static {
-        System.load("c:/Users/PC/Projects/tuntap4j/native/windows/cmake-build-release/tuntap4j.dll");
+        System.load("/home/pc/Documents/Projects/tuntap4j/native/linux/cmake-build-release/libtuntap4j.so");
+//        System.load("c:/Users/PC/Projects/tuntap4j/native/windows/cmake-build-release/tuntap4j.dll");
     }
 
     enum Type {
@@ -58,14 +59,10 @@ public abstract class NetworkDevice {
     }
 
     public int getMTU() throws IOException {
-        if (type == Type.TUN)
-            throw new UnsupportedOperationException("TUN device does not have MTU");
         return getMTU(deviceName, deviceHandle);
     }
 
     public void setMTU(int mtu) throws IOException {
-        if (type == Type.TUN)
-            throw new UnsupportedOperationException("TUN device does not have MTU");
         setMTU(deviceName, deviceHandle, mtu);
     }
 

@@ -20,7 +20,7 @@ JNIEXPORT jboolean JNICALL Java_one_papachi_tuntap4j_NetworkDevice_isOpen
  * Method:    open
  * Signature: (Ljava/lang/String;Z)I
  */
-JNIEXPORT jint JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open
+JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open
   (JNIEnv *, jclass, jstring, jboolean);
 
 /*
