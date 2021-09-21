@@ -37,7 +37,7 @@ JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open(JNIEnv *env
     char *devicePath = concat("/dev/", _device);
     int fd = open(devicePath, O_RDWR);
     if (fd == -1) {
-        throwException(env, "java/io/IOexception", errno);
+        throwException(env, "java/io/IOException", errno);
     }
     free(devicePath);
     (*env)->ReleaseStringUTFChars(env, deviceName, _device);
