@@ -6,7 +6,8 @@ import java.nio.ByteBuffer;
 public abstract class NetworkDevice {
 
     static {
-        System.load("/home/pc/Documents/Projects/tuntap4j/native/linux/cmake-build-release/libtuntap4j.so");
+        System.load("/Users/pc/Documents/Projects/tuntap4j/native/macos/cmake-build-release/libtuntap4j.dylib");
+//        System.load("/home/pc/Documents/Projects/tuntap4j/native/linux/cmake-build-release/libtuntap4j.so");
 //        System.load("c:/Users/PC/Projects/tuntap4j/native/windows/cmake-build-release/tuntap4j.dll");
     }
 
