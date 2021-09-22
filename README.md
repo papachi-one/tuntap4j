@@ -34,6 +34,8 @@ class App {
 ```
 ```java
 import one.papachi.tuntap4j.TapDeviceDevice;
+import java.io.IOException;
+
 class App {
 
     public static void main(String[] args) throws IOException {
