@@ -13,6 +13,72 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 
+#include <sys/kern_event.h>
+#include <sys/kern_control.h>
+#include <ctype.h>
+
+#define UTUN_CONTROL_NAME "com.apple.net.utun_control"
+#define UTUN_OPT_IFNAME 2
+
+struct utunDevice {
+    jlong fd;
+    char *ifName;
+    struct utunDevice *Next;
+};
+
+struct utunDevice *list = NULL;
+
+void add(struct utunDevice *device) {
+    if (list == NULL) {
+        list = device;
+    } else {
+        struct utunDevice *item = list;
+        while (item) {
+            if (item->Next == NULL) {
+                item->Next = device;
+                break;
+            }
+            item = item->Next;
+        }
+    }
+}
+
+void delete(jlong deviceHandle) {
+    if (list != NULL) {
+        struct utunDevice *item = list;
+        struct utunDevice *previous = NULL;
+        while (item) {
+            if (item->fd == deviceHandle) {
+                if (previous == NULL) {
+                    list = item->Next;
+                } else {
+                    previous->Next = item->Next;
+                }
+                free(item->ifName);
+                free(item);
+                break;
+            }
+            previous = item;
+            item = item->Next;
+        }
+    }
+}
+
+char * getDeviceName(jlong deviceHandle) {
+    char *deviceName = NULL;
+    if (list != NULL) {
+        struct utunDevice *item = list;
+        while (item) {
+            if (item->fd == deviceHandle) {
+                deviceName = item->ifName;
+                break;
+            }
+            item = item->Next;
+        }
+    }
+    return deviceName;
+}
+
 char* concat(const char *s1, const char *s2) {
     const size_t len1 = strlen(s1);
     const size_t len2 = strlen(s2);
@@ -33,13 +99,55 @@ JNIEXPORT jboolean JNICALL Java_one_papachi_tuntap4j_NetworkDevice_isOpen(JNIEnv
 }
 
 JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open(JNIEnv *env, jclass class, jstring deviceName, jboolean isTAP) {
+    int fd = -1;
     const char *_device = (*env)->GetStringUTFChars(env, deviceName, NULL);
-    char *devicePath = concat("/dev/", _device);
-    int fd = open(devicePath, O_RDWR);
-    if (fd == -1) {
-        throwException(env, "java/io/IOException", errno);
+    if (isTAP == JNI_TRUE) {
+        char *devicePath = concat("/dev/", _device);
+        if ((fd= open(devicePath, O_RDWR)) == -1) {
+            throwException(env, "java/io/IOException", errno);
+        }
+        free(devicePath);
+    } else {
+        if ((fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)) == -1) {
+            throwException(env, "java/io/IOException", errno);
+        } else {
+            struct ctl_info info;
+            bzero(&info, sizeof info);
+            strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
+            if (ioctl(fd, CTLIOCGINFO, &info) == -1) {
+                close(fd);
+                fd = -1;
+                throwException(env, "java/io/IOException", errno);
+            } else {
+                struct sockaddr_ctl addr;
+                addr.sc_len = sizeof(addr);
+                addr.sc_family = AF_SYSTEM;
+                addr.ss_sysaddr = AF_SYS_CONTROL;
+                addr.sc_id = info.ctl_id;
+                addr.sc_unit = atoi(_device);
+                if (connect(fd, (struct sockaddr *) &addr, sizeof addr) == -1) {
+                    close(fd);
+                    fd = -1;
+                    throwException(env, "java/io/IOException", errno);
+                } else {
+                    int utunname_len = 255;
+                    char* utunname = (char*) malloc(sizeof(char) * (utunname_len + 1));
+                    if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, utunname, (socklen_t*) &utunname_len) == -1) {
+                        close(fd);
+                        fd = -1;
+                        free(utunname);
+                        throwException(env, "java/io/IOException", errno);
+                    } else {
+                        struct utunDevice *device = (struct utunDevice*) malloc(sizeof(struct utunDevice));
+                        device->fd = fd;
+                        device->ifName = utunname;
+                        device->Next = NULL;
+                        add(device);
+                    }
+                }
+            }
+        }
     }
-    free(devicePath);
     (*env)->ReleaseStringUTFChars(env, deviceName, _device);
     return (jlong) fd;
 }
@@ -115,16 +223,18 @@ JNIEXPORT jint JNICALL Java_one_papachi_tuntap4j_NetworkDevice_write(JNIEnv *env
 }
 
 JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_close(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle) {
+    delete(deviceHandle);
     if (close(deviceHandle) == -1) {
         throwException(env, "java/io/IOException", errno);
     }
 }
 
 JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setStatus(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle, jboolean isUp) {
+    const char *device = getDeviceName(deviceHandle);
     const char *_device = (*env)->GetStringUTFChars(env, deviceName, NULL);
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, _device, IFNAMSIZ);
+    strncpy(ifr.ifr_name, device != NULL ? device : _device, IFNAMSIZ);
     ifr.ifr_flags = JNI_TRUE == isUp ? IFF_UP : 0;
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -147,12 +257,15 @@ JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setStatus(JNIEnv 
     (*env)->ReleaseStringUTFChars(env, deviceName, _device);
 }
 
+// /sbin/ifconfig <utun0>
+
 JNIEXPORT jint JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getMTU(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle) {
     jint result = -1;
+    const char *device = getDeviceName(deviceHandle);
     const char *_device = (*env)->GetStringUTFChars(env, deviceName, NULL);
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, _device, IFNAMSIZ);
+    strncpy(ifr.ifr_name, device != NULL ? device : _device, IFNAMSIZ);
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         throwException(env, "java/io/IOException", errno);
@@ -169,10 +282,11 @@ JNIEXPORT jint JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getMTU(JNIEnv *en
 }
 
 JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setMTU(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle, jint mtu) {
+    const char *device = getDeviceName(deviceHandle);
     const char *_device = (*env)->GetStringUTFChars(env, deviceName, NULL);
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, _device, IFNAMSIZ);
+    strncpy(ifr.ifr_name, device != NULL ? device : _device, IFNAMSIZ);
     ifr.ifr_ifru.ifru_mtu = mtu;
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -187,11 +301,12 @@ JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setMTU(JNIEnv *en
 }
 
 JNIEXPORT jstring JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getIPAddress(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle) {
+    const char *device = getDeviceName(deviceHandle);
     const char *_deviceName = (*env)->GetStringUTFChars(env, deviceName, NULL);
     jstring string = NULL;
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, _deviceName, IFNAMSIZ);
+    strncpy(ifr.ifr_name, device != NULL ? device :  _deviceName, IFNAMSIZ);
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         throwException(env, "java/io/IOException", errno);
@@ -224,12 +339,13 @@ JNIEXPORT jstring JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getIPAddress(J
 }
 
 JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setIPAddress(JNIEnv *env, jclass class1, jstring deviceName, jlong deviceHandle, jstring address, jstring mask) {
+    const char *device = getDeviceName(deviceHandle);
     const char *_deviceName = (*env)->GetStringUTFChars(env, deviceName, NULL);
     const char *_address = (*env)->GetStringUTFChars(env, address, NULL);
     const char *_mask = (*env)->GetStringUTFChars(env, mask, NULL);
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, _deviceName, IFNAMSIZ);
+    strncpy(ifr.ifr_name, device != NULL ? device : _deviceName, IFNAMSIZ);
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         throwException(env, "java/io/IOException", errno);
