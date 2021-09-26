@@ -377,18 +377,20 @@ JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setMACAddress(JNI
     throwException(env, "java/lang/UnsupportedOperationException", ERROR_CALL_NOT_IMPLEMENTED);
 }
 
-JNIEXPORT jobject JNICALL Java_one_papachi_tap4j_Tap4j_nativeList(JNIEnv *env, jclass _class) {
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTunDevices(JNIEnv *env, jclass _class) {
+    jclass class = (*env)->FindClass(env, "java/util/ArrayList");
+    jmethodID constructor = (*env)->GetMethodID(env, class, "<init>", "()V");
+    jobject result = (*env)->NewObject(env, class, constructor);
+    return result;
+}
+
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTapDevices(JNIEnv *env, jclass _class) {
     jclass class = (*env)->FindClass(env, "java/util/ArrayList");
     jmethodID constructor = (*env)->GetMethodID(env, class, "<init>", "()V");
     jmethodID add = (*env)->GetMethodID(env, class, "add", "(Ljava/lang/Object;)Z");
     jobject result = (*env)->NewObject(env, class, constructor);
-
-    jclass class1 = (*env)->FindClass(env, "one/papachi/tap4j/TapDevice");
-    jmethodID constructor1 = (*env)->GetMethodID(env, class1, "<init>", "(Ljava/lang/String;)V");
-
     const char adapterKey[] = ADAPTER_KEY;
     HKEY hKey;
-
     if (RegOpenKeyA(HKEY_LOCAL_MACHINE, adapterKey, &hKey) == ERROR_SUCCESS) {
         DWORD lpcSubKeys = 0;
         DWORD lpcMaxSubKeyLen = 0;
@@ -396,25 +398,30 @@ JNIEXPORT jobject JNICALL Java_one_papachi_tap4j_Tap4j_nativeList(JNIEnv *env, j
             char name[255];
             DWORD nameLength = 255;
             for (DWORD i = 0; i < lpcSubKeys; i++) {
-                RegEnumKeyA(hKey, i, name, nameLength);
-                DWORD dataType;
-                char value[255];
-                PVOID pvData = value;
-                DWORD size = sizeof(value);
-                RegGetValueA(hKey, name, "ComponentId", RRF_RT_REG_SZ | RRF_ZEROONFAILURE, &dataType, pvData, &size);
-                if (strcmp(value, "tap0901") == 0) {
-                    DWORD dataTypeNetCfgInstanceId;
-                    char valueNetCfgInstanceId[255];
-                    PVOID pvDataNetCfgInstanceId = valueNetCfgInstanceId;
-                    DWORD sizeNetCfgInstanceId = sizeof(valueNetCfgInstanceId);
-                    RegGetValueA(hKey, name, "NetCfgInstanceId", RRF_RT_REG_SZ | RRF_ZEROONFAILURE, &dataTypeNetCfgInstanceId, pvDataNetCfgInstanceId, &sizeNetCfgInstanceId);
-                    jstring netCfgInstanceId = (*env)->NewStringUTF(env, valueNetCfgInstanceId);
-
-                    jobject device = (*env)->NewObject(env, class1, constructor1, netCfgInstanceId);
-                    (*env)->CallBooleanMethod(env, result, add, device);
-
-                    (*env)->DeleteLocalRef(env, device);
-                    (*env)->DeleteLocalRef(env, netCfgInstanceId);
+                if (RegEnumKeyA(hKey, i, name, nameLength) == ERROR_SUCCESS) {
+                    DWORD dataType;
+                    char value[255];
+                    PVOID pvData = value;
+                    DWORD size = sizeof(value);
+                    if (RegGetValueA(hKey, name, "ComponentId", RRF_RT_REG_SZ | RRF_ZEROONFAILURE, &dataType, pvData, &size) == ERROR_SUCCESS) {
+                        if (strcmp(value, "tap0901") == 0) {
+                            DWORD dataTypeNetCfgInstanceId;
+                            char valueNetCfgInstanceId[255];
+                            PVOID pvDataNetCfgInstanceId = valueNetCfgInstanceId;
+                            DWORD sizeNetCfgInstanceId = sizeof(valueNetCfgInstanceId);
+                            if (RegGetValueA(hKey, name, "NetCfgInstanceId", RRF_RT_REG_SZ | RRF_ZEROONFAILURE, &dataTypeNetCfgInstanceId, pvDataNetCfgInstanceId, &sizeNetCfgInstanceId) == ERROR_SUCCESS) {
+                                char *tmp1 = concat("\\\\.\\", pvDataNetCfgInstanceId);
+                                char *tmp2 = concat(tmp1, ".tap");
+                                HANDLE handle = CreateFileA(tmp2, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_SYSTEM, 0);
+                                if (handle != INVALID_HANDLE_VALUE) {
+                                    jstring netCfgInstanceId = (*env)->NewStringUTF(env, valueNetCfgInstanceId);
+                                    (*env)->CallBooleanMethod(env, result, add, netCfgInstanceId);
+                                }
+                                free(tmp1);
+                                free(tmp2);
+                            }
+                        }
+                    }
                 }
             }
         }

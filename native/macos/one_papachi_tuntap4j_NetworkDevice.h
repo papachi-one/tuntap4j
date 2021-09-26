@@ -18,7 +18,7 @@ JNIEXPORT jboolean JNICALL Java_one_papachi_tuntap4j_NetworkDevice_isOpen
 /*
  * Class:     one_papachi_tuntap4j_NetworkDevice
  * Method:    open
- * Signature: (Ljava/lang/String;Z)I
+ * Signature: (Ljava/lang/String;Z)J
  */
 JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open
   (JNIEnv *, jclass, jstring, jboolean);
@@ -102,6 +102,22 @@ JNIEXPORT jbyteArray JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getMACAddre
  */
 JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setMACAddress
   (JNIEnv *, jclass, jstring, jlong, jbyteArray);
+
+/*
+ * Class:     one_papachi_tuntap4j_NetworkDevice
+ * Method:    getAvailableTunDevices
+ * Signature: ()Ljava/util/List;
+ */
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTunDevices
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     one_papachi_tuntap4j_NetworkDevice
+ * Method:    getAvailableTapDevices
+ * Signature: ()Ljava/util/List;
+ */
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTapDevices
+  (JNIEnv *, jclass);
 
 #ifdef __cplusplus
 }

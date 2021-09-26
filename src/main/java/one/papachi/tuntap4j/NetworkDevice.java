@@ -2,13 +2,14 @@ package one.papachi.tuntap4j;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 public abstract class NetworkDevice {
 
     static {
-        System.load("/Users/pc/Documents/Projects/tuntap4j/native/macos/cmake-build-release/libtuntap4j.dylib");
+//        System.load("/Users/pc/Documents/Projects/tuntap4j/native/macos/cmake-build-release/libtuntap4j.dylib");
 //        System.load("/home/pc/Documents/Projects/tuntap4j/native/linux/cmake-build-release/libtuntap4j.so");
-//        System.load("c:/Users/PC/Projects/tuntap4j/native/windows/cmake-build-release/tuntap4j.dll");
+        System.load("c:/Users/PC/Projects/tuntap4j/native/windows/cmake-build-release/tuntap4j.dll");
     }
 
     enum Type {
@@ -102,5 +103,9 @@ public abstract class NetworkDevice {
     protected static native byte[] getMACAddress(String deviceName, long deviceHandle) throws IOException;
 
     protected static native void setMACAddress(String deviceName, long deviceHandle, byte[] macAddress) throws IOException;
+
+    protected static native List<String> getAvailableTunDevices() throws IOException;
+
+    protected static native List<String> getAvailableTapDevices() throws IOException;
 
 }
