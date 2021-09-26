@@ -10,6 +10,8 @@
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <malloc.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 char* concat(const char *s1, const char *s2) {
     const size_t len1 = strlen(s1);
@@ -303,4 +305,82 @@ JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setMACAddress(JNI
 
 JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_nativeList(JNIEnv *env, jclass class) {
     throwException(env, "java/lang/UnsupportedOperationException", ENOSYS);
+}
+
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTunDevices(JNIEnv *env, jclass _class) {
+    jclass class = (*env)->FindClass(env, "java/util/ArrayList");
+    jmethodID constructor = (*env)->GetMethodID(env, class, "<init>", "()V");
+    jmethodID add = (*env)->GetMethodID(env, class, "add", "(Ljava/lang/Object;)Z");
+    jobject result = (*env)->NewObject(env, class, constructor);
+    struct dirent *dir;
+    DIR *d;
+    if ((d = opendir("/sys/class/net")) != NULL) {
+        while ((dir = readdir(d)) != NULL) {
+            char *tmp1 = concat("/sys/class/net/", dir->d_name);
+            char *tmp2 = concat(tmp2, "/tun_flags");
+            char *deviceName = concat("", dir->d_name);
+            struct stat st;
+            if (stat(tmp2, &st) != -1) {
+                char *tmp3 = concat(tmp1, "/addr_len");
+                FILE *f;
+                if ((f = fopen(tmp3, "r")) != NULL) {
+                    int c = fgetc(f);
+                    if (c == '0') {
+                        jstring device = (*env)->NewStringUTF(env, deviceName);
+                        (*env)->CallBooleanMethod(env, result, add, device);
+                    }
+                    fclose(f);
+                } else {
+                    throwException(env, "java/io/IOException", errno);
+                }
+                free(tmp3);
+            }
+            free(tmp1);
+            free(tmp2);
+            free(deviceName);
+        }
+        closedir(d);
+    } else {
+        throwException(env, "java/io/IOException", errno);
+    }
+    return result;
+}
+
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTapDevices(JNIEnv *env, jclass _class) {
+    jclass class = (*env)->FindClass(env, "java/util/ArrayList");
+    jmethodID constructor = (*env)->GetMethodID(env, class, "<init>", "()V");
+    jmethodID add = (*env)->GetMethodID(env, class, "add", "(Ljava/lang/Object;)Z");
+    jobject result = (*env)->NewObject(env, class, constructor);
+    struct dirent *dir;
+    DIR *d;
+    if ((d = opendir("/sys/class/net")) != NULL) {
+        while ((dir = readdir(d)) != NULL) {
+            char *tmp1 = concat("/sys/class/net/", dir->d_name);
+            char *tmp2 = concat(tmp2, "/tun_flags");
+            char *deviceName = concat("", dir->d_name);
+            struct stat st;
+            if (stat(tmp2, &st) != -1) {
+                char *tmp3 = concat(tmp1, "/addr_len");
+                FILE *f;
+                if ((f = fopen(tmp3, "r")) != NULL) {
+                    int c = fgetc(f);
+                    if (c == '6') {
+                        jstring device = (*env)->NewStringUTF(env, deviceName);
+                        (*env)->CallBooleanMethod(env, result, add, device);
+                    }
+                    fclose(f);
+                } else {
+                    throwException(env, "java/io/IOException", errno);
+                }
+                free(tmp3);
+            }
+            free(tmp1);
+            free(tmp2);
+            free(deviceName);
+        }
+        closedir(d);
+    } else {
+        throwException(env, "java/io/IOException", errno);
+    }
+    return result;
 }
