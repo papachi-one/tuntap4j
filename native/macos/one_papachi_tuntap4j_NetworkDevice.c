@@ -103,46 +103,50 @@ JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open(JNIEnv *env
     const char *_device = (*env)->GetStringUTFChars(env, deviceName, NULL);
     if (isTAP == JNI_TRUE) {
         char *devicePath = concat("/dev/", _device);
-        if ((fd= open(devicePath, O_RDWR)) == -1) {
+        if ((fd = open(devicePath, O_RDWR)) == -1) {
             throwException(env, "java/io/IOException", errno);
         }
         free(devicePath);
     } else {
-        if ((fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)) == -1) {
-            throwException(env, "java/io/IOException", errno);
+        if (strlen(_device) < 5) {
+            throwException(env, "java/io/IOException", EINVAL);
         } else {
-            struct ctl_info info;
-            bzero(&info, sizeof info);
-            strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
-            if (ioctl(fd, CTLIOCGINFO, &info) == -1) {
-                close(fd);
-                fd = -1;
+            if ((fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)) == -1) {
                 throwException(env, "java/io/IOException", errno);
             } else {
-                struct sockaddr_ctl addr;
-                addr.sc_len = sizeof(addr);
-                addr.sc_family = AF_SYSTEM;
-                addr.ss_sysaddr = AF_SYS_CONTROL;
-                addr.sc_id = info.ctl_id;
-                addr.sc_unit = atoi(_device);
-                if (connect(fd, (struct sockaddr *) &addr, sizeof addr) == -1) {
+                struct ctl_info info;
+                bzero(&info, sizeof info);
+                strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
+                if (ioctl(fd, CTLIOCGINFO, &info) == -1) {
                     close(fd);
                     fd = -1;
                     throwException(env, "java/io/IOException", errno);
                 } else {
-                    int utunname_len = 255;
-                    char* utunname = (char*) malloc(sizeof(char) * (utunname_len + 1));
-                    if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, utunname, (socklen_t*) &utunname_len) == -1) {
+                    struct sockaddr_ctl addr;
+                    addr.sc_len = sizeof(addr);
+                    addr.sc_family = AF_SYSTEM;
+                    addr.ss_sysaddr = AF_SYS_CONTROL;
+                    addr.sc_id = info.ctl_id;
+                    addr.sc_unit = atoi(_device + 4);
+                    if (connect(fd, (struct sockaddr *) &addr, sizeof addr) == -1) {
                         close(fd);
                         fd = -1;
-                        free(utunname);
                         throwException(env, "java/io/IOException", errno);
                     } else {
-                        struct utunDevice *device = (struct utunDevice*) malloc(sizeof(struct utunDevice));
-                        device->fd = fd;
-                        device->ifName = utunname;
-                        device->Next = NULL;
-                        add(device);
+                        int utunname_len = 255;
+                        char* utunname = (char*) malloc(sizeof(char) * (utunname_len + 1));
+                        if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, utunname, (socklen_t*) &utunname_len) == -1) {
+                            close(fd);
+                            fd = -1;
+                            free(utunname);
+                            throwException(env, "java/io/IOException", errno);
+                        } else {
+                            struct utunDevice *device = (struct utunDevice*) malloc(sizeof(struct utunDevice));
+                            device->fd = fd;
+                            device->ifName = utunname;
+                            device->Next = NULL;
+                            add(device);
+                        }
                     }
                 }
             }
@@ -256,8 +260,6 @@ JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setStatus(JNIEnv 
     }
     (*env)->ReleaseStringUTFChars(env, deviceName, _device);
 }
-
-// /sbin/ifconfig <utun0>
 
 JNIEXPORT jint JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getMTU(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle) {
     jint result = -1;
@@ -423,7 +425,58 @@ JNIEXPORT void JNICALL Java_one_papachi_tuntap4j_NetworkDevice_setMACAddress(JNI
     (*env)->ReleaseStringUTFChars(env, deviceName, _device);
 }
 
-JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_nativeList(JNIEnv *env, jclass class) {
-    throwException(env, "java/lang/UnsupportedOperationException", ENOSYS);
-    return NULL;
+
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTunDevices(JNIEnv *env, jclass _class) {
+    jclass class = (*env)->FindClass(env, "java/util/ArrayList");
+    jmethodID constructor = (*env)->GetMethodID(env, class, "<init>", "()V");
+    jmethodID add = (*env)->GetMethodID(env, class, "add", "(Ljava/lang/Object;)Z");
+    jobject result = (*env)->NewObject(env, class, constructor);
+    for (int i = 1; i <= 256; ++i) {
+        int fd;
+        if ((fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)) != -1) {
+            struct ctl_info info;
+            bzero(&info, sizeof info);
+            strncpy(info.ctl_name, UTUN_CONTROL_NAME, MAX_KCTL_NAME);
+            if (ioctl(fd, CTLIOCGINFO, &info) != -1) {
+                struct sockaddr_ctl addr;
+                addr.sc_len = sizeof(addr);
+                addr.sc_family = AF_SYSTEM;
+                addr.ss_sysaddr = AF_SYS_CONTROL;
+                addr.sc_id = info.ctl_id;
+                addr.sc_unit = i;
+                if (connect(fd, (struct sockaddr *) &addr, sizeof addr) != -1) {
+                    int utunname_len = 255;
+                    char* utunname = (char*) malloc(sizeof(char) * (utunname_len + 1));
+                    if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, utunname, (socklen_t*) &utunname_len) != -1) {
+                        jstring device = (*env)->NewStringUTF(env, utunname);
+                        (*env)->CallBooleanMethod(env, result, add, device);
+                    }
+                }
+            }
+            close(fd);
+        }
+    }
+    return result;
+}
+
+JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTapDevices(JNIEnv *env, jclass _class) {
+    jclass class = (*env)->FindClass(env, "java/util/ArrayList");
+    jmethodID constructor = (*env)->GetMethodID(env, class, "<init>", "()V");
+    jmethodID add = (*env)->GetMethodID(env, class, "add", "(Ljava/lang/Object;)Z");
+    jobject result = (*env)->NewObject(env, class, constructor);
+    for (int i = 0; i < 16; ++i) {
+        char number[3];
+        snprintf(number, sizeof(number), "%d", i);
+        char *deviceName = concat("tap", number);
+        char *devicePath = concat("/dev/", deviceName);
+        int fd;
+        if ((fd = open(devicePath, O_RDWR)) != -1) {
+            close(fd);
+            jstring device = (*env)->NewStringUTF(env, deviceName);
+            (*env)->CallBooleanMethod(env, result, add, device);
+        }
+        free(deviceName);
+        free(devicePath);
+    }
+    return result;
 }
