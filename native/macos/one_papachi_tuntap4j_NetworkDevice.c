@@ -127,7 +127,7 @@ JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open(JNIEnv *env
                     addr.sc_family = AF_SYSTEM;
                     addr.ss_sysaddr = AF_SYS_CONTROL;
                     addr.sc_id = info.ctl_id;
-                    addr.sc_unit = atoi(_device + 4);
+                    addr.sc_unit = atoi(_device + 4) + 1;
                     if (connect(fd, (struct sockaddr *) &addr, sizeof addr) == -1) {
                         close(fd);
                         fd = -1;
