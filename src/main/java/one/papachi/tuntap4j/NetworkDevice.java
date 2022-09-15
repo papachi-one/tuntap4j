@@ -1,15 +1,22 @@
 package one.papachi.tuntap4j;
 
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.util.List;
 
 public abstract class NetworkDevice {
 
+    private static final String temporaryLibraryPath = System.getProperty("java.io.tmpdir");
+
     static {
-//        System.load("/Users/pc/Documents/Projects/tuntap4j/native/macos/cmake-build-release/libtuntap4j.dylib");
-        System.load("/home/pc/Documents/Projects/tuntap4j/native/linux/cmake-build-release/libtuntap4j.so");
-//        System.load("c:/Users/PC/Projects/tuntap4j/native/windows/cmake-build-release/tuntap4j.dll");
+        String library = Utils.getOperatingSystemFamily().getLibraryName();
+        File file = Paths.get(temporaryLibraryPath, library).toFile();
+        try (InputStream is = NetworkDevice.class.getResourceAsStream(library); OutputStream os = new FileOutputStream(file)) {
+            is.transferTo(os);
+        } catch (Exception e) {
+        }
+        System.load(file.getAbsolutePath());
     }
 
     enum Type {
