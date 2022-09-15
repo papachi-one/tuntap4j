@@ -1,5 +1,6 @@
 # tuntap4j
 Java library for interfacing with TUN/TAP devices.
+It uses JNI library written in C to interface with native TUN/TAP devices.
 ## Supported platforms
 ### Linux
 Linux provides out of the box support for TUN and TAP devices without any installation required.
