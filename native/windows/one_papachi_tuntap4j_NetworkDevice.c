@@ -90,6 +90,7 @@ JNIEXPORT jlong JNICALL Java_one_papachi_tuntap4j_NetworkDevice_open(JNIEnv *env
     (*env)->ReleaseStringUTFChars(env, deviceName, _deviceName);
     if (handle == INVALID_HANDLE_VALUE) {
         DWORD error = GetLastError();
+        printf("%d\n", error);
         throwException(env, "java/io/IOException", error);
     }
     return (jlong) handle;
@@ -419,6 +420,7 @@ JNIEXPORT jobject JNICALL Java_one_papachi_tuntap4j_NetworkDevice_getAvailableTa
                                 }
                                 free(tmp1);
                                 free(tmp2);
+                                CloseHandle(handle);
                             }
                         }
                     }
