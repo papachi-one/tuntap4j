@@ -72,6 +72,7 @@ ULONG getAddr(JNIEnv *env, const char *input) {
 }
 
 JNIEXPORT jboolean JNICALL Java_one_papachi_tuntap4j_NetworkDevice_isOpen(JNIEnv *env, jclass class, jstring deviceName, jlong deviceHandle) {
+    INVALID_HANDLE_VALUE
     DWORD flags;
     return GetHandleInformation((HANDLE) deviceHandle, &flags) ? JNI_TRUE : JNI_FALSE;
 }
