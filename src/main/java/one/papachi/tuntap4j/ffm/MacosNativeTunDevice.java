@@ -7,6 +7,7 @@ import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class MacosNativeTunDevice implements TunDevice {
 
@@ -16,9 +17,9 @@ public class MacosNativeTunDevice implements TunDevice {
         MacosNativeTunDevice tun = new MacosNativeTunDevice(api, deviceName);
         tun.open();
         System.out.println(tun.isUp());
-        System.out.println(tun.getMtu());
-        tun.setMtu(1024);
-        System.out.println(tun.getMtu());
+        Thread.sleep(1000);
+        tun.setInetAddress(null);
+        tun.getInetAddress();
         ByteBuffer dst = ByteBuffer.allocateDirect(1514);
         while (tun.read(dst.clear()) != -1) {
             dst.flip();
@@ -238,12 +239,97 @@ public class MacosNativeTunDevice implements TunDevice {
 
     @Override
     public InetAddress getInetAddress() throws IOException {
-        return null;
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment ifr = arena.allocate(32);
+            ifr.setString(0, deviceName);
+            int handle;
+            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
+                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+                p_error = p_error.reinterpret(4);
+                int error = p_error.get(ValueLayout.JAVA_INT, 0);
+                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+                strerror = strerror.reinterpret(1000);
+                String string = strerror.getString(0);
+                throw new IOException("Failed to call socket. " + error + " " + string);
+            }
+            ifr.set(ValueLayout.JAVA_BYTE, 17, (byte) 2);
+            int SIOCGIFADDR = (int) 3223349537L;
+            if ((int) api.ioctl.invokeExact(handle, SIOCGIFADDR, ifr) == -1) {
+                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+                p_error = p_error.reinterpret(4);
+                int error = p_error.get(ValueLayout.JAVA_INT, 0);
+                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+                strerror = strerror.reinterpret(1000);
+                String string = strerror.getString(0);
+                throw new IOException("Failed to call ioctl. " + error + " " + string);
+            }
+            int address = ifr.get(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20);
+            int SIOCGIFNETMASK = (int) 3223349541L;
+            if ((int) api.ioctl.invokeExact(handle, SIOCGIFNETMASK, ifr) == -1) {
+                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+                p_error = p_error.reinterpret(4);
+                int error = p_error.get(ValueLayout.JAVA_INT, 0);
+                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+                strerror = strerror.reinterpret(1000);
+                String string = strerror.getString(0);
+                throw new IOException("Failed to call ioctl. " + error + " " + string);
+            }
+            int mask = ifr.get(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20);
+            InetAddress ipAddress = InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(address).array());
+            InetAddress ipMask = InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(mask).array());
+            System.out.println(ipAddress);
+            System.out.println(ipMask);
+            return null;
+        } catch (IOException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new IOException("Native function has failed.", e);
+        }
     }
 
     @Override
     public void setInetAddress(InetAddress inetAddress) throws IOException {
-
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment ifr = arena.allocate(32);
+            ifr.setString(0, deviceName);
+            int handle;
+            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
+                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+                p_error = p_error.reinterpret(4);
+                int error = p_error.get(ValueLayout.JAVA_INT, 0);
+                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+                strerror = strerror.reinterpret(1000);
+                String string = strerror.getString(0);
+                throw new IOException("Failed to call socket. " + error + " " + string);
+            }
+            ifr.set(ValueLayout.JAVA_BYTE, 17, (byte) 2);
+            ifr.set(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20, ByteBuffer.wrap(new byte[] {10, 0, 0, 1}).getInt());
+            int SIOCSIFADDR = (int) 2149607692L;
+            if ((int) api.ioctl.invokeExact(handle, SIOCSIFADDR, ifr) == -1) {
+                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+                p_error = p_error.reinterpret(4);
+                int error = p_error.get(ValueLayout.JAVA_INT, 0);
+                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+                strerror = strerror.reinterpret(1000);
+                String string = strerror.getString(0);
+                throw new IOException("Failed to call ioctl. " + error + " " + string);
+            }
+            ifr.set(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20, ByteBuffer.wrap(new byte[] {(byte) 255, 0, 0, 0}).getInt());
+            int SIOCSIFNETMASK = (int) 2149607702L;
+            if ((int) api.ioctl.invokeExact(handle, SIOCSIFNETMASK, ifr) == -1) {
+                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+                p_error = p_error.reinterpret(4);
+                int error = p_error.get(ValueLayout.JAVA_INT, 0);
+                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+                strerror = strerror.reinterpret(1000);
+                String string = strerror.getString(0);
+                throw new IOException("Failed to call ioctl. " + error + " " + string);
+            }
+        } catch (IOException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new IOException("Native function has failed.", e);
+        }
     }
 
     @Override
