@@ -35,7 +35,7 @@ public interface NetworkDevice {
 
     int getMtu() throws IOException;
 
-    void setMtu() throws IOException;
+    void setMtu(int mtu) throws IOException;
 
     byte[] getMacAddress() throws IOException;
 

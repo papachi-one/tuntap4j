@@ -330,7 +330,7 @@ public class TapV9Adapter implements TapDevice {
         }
     }
 
-    public void setMtu() throws IOException {
+    public void setMtu(int mtu) throws IOException {
 
     }
 
