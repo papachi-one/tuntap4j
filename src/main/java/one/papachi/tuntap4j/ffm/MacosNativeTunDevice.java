@@ -4,7 +4,6 @@ import one.papachi.tuntap4j.api.TunDevice;
 
 import java.io.IOException;
 import java.lang.foreign.*;
-import java.lang.invoke.VarHandle;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -38,9 +37,28 @@ public class MacosNativeTunDevice implements TunDevice {
         this.deviceName = deviceName;
     }
 
+    private static final int F_GETFD = 1;
+    private static final int PF_SYSTEM = 32;
+    private static final int SOCK_DGRAM = 2;
+    private static final int SYSPROTO_CONTROL = 2;
+    private static final String UTUN_CONTROL_NAME = "com.apple.net.utun_control";
+    private static final int CTLIOCGINFO = (int) 3227799043L;
+    private static final int AF_SYSTEM = 32;
+    private static final int AF_INET = 2;
+    private static final int AF_SYS_CONTROL = 2;
+    private static final int UTUN_OPT_IFNAME = 2;
+    private static final int SIOCGIFFLAGS = (int) 3223349521L;
+    private static final int SIOCSIFFLAGS = (int) 2149607696L;
+    private static final short IFF_UP = 1;
+    private static final int SIOCGIFADDR = (int) 3223349537L;
+    private static final int SIOCSIFADDR = (int) 2149607692L;
+    private static final int SIOCGIFNETMASK = (int) 3223349541L;
+    private static final int SIOCSIFNETMASK = (int) 2149607702L;
+    private static final int SIOCGIFMTU = (int) 3223349555L;
+    private static final int SIOCSIFMTU = (int) 2149607732L;
+
     @Override
     public boolean isOpen() throws IOException {
-        int F_GETFD = 1;
         try {
             return (int) api.fcntl.invokeExact(handle, F_GETFD) != -1;
         } catch (Throwable e) {
@@ -51,69 +69,28 @@ public class MacosNativeTunDevice implements TunDevice {
     @Override
     public void open() throws IOException {
         try (Arena arena = Arena.ofConfined()) {
-            int PF_SYSTEM = 32;
-            int SOCK_DGRAM = 2;
-            int SYSPROTO_CONTROL = 2;
-            String UTUN_CONTROL_NAME = "com.apple.net.utun_control";
-            int CTLIOCGINFO = (int) 3227799043L;
-            int AF_SYSTEM = 32;
-            int AF_SYS_CONTROL = 2;
             if ((handle = (int) api.socket.invokeExact(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL)) == -1) {
-                throw new IOException("Failed to open socket.");
+                getAndThrowException("socket");
             }
-            StructLayout ctl_info = MemoryLayout.structLayout(
-                    ValueLayout.JAVA_INT.withName("ctl_id"),
-                    MemoryLayout.sequenceLayout(96, ValueLayout.JAVA_BYTE).withName("ctl_name")
-            );
             MemorySegment info = arena.allocate(100);
             info.setString(4, UTUN_CONTROL_NAME);
             if ((int) api.ioctl.invokeExact(handle, CTLIOCGINFO, info) == -1) {
-                throw new IOException("Failed to call ioctl.");
+                getAndThrowException("ioctl");
             }
-            StructLayout sockaddr_ctl = MemoryLayout.structLayout(
-                    ValueLayout.JAVA_BYTE.withName("sc_len"),
-                    ValueLayout.JAVA_BYTE.withName("sc_family"),
-                    ValueLayout.JAVA_SHORT.withName("ss_sysaddr"),
-                    ValueLayout.JAVA_INT.withName("sc_id"),
-                    ValueLayout.JAVA_INT.withName("sc_unit"),
-                    ValueLayout.JAVA_INT.withName("sc_reserved[0]"),
-                    ValueLayout.JAVA_INT.withName("sc_reserved[1]"),
-                    ValueLayout.JAVA_INT.withName("sc_reserved[2]"),
-                    ValueLayout.JAVA_INT.withName("sc_reserved[3]"),
-                    ValueLayout.JAVA_INT.withName("sc_reserved[4]")
-            );
-            MemorySegment addr = arena.allocate(sockaddr_ctl);
+            MemorySegment addr = arena.allocate(32);
             addr.set(ValueLayout.JAVA_BYTE, 0, (byte) addr.byteSize());
             addr.set(ValueLayout.JAVA_BYTE, 1, (byte) AF_SYSTEM);
             addr.set(ValueLayout.JAVA_SHORT, 2, (short) AF_SYS_CONTROL);
             addr.set(ValueLayout.JAVA_INT, 4, info.get(ValueLayout.JAVA_INT, 0));
             addr.set(ValueLayout.JAVA_INT, 8, 6);// developer private number utunX X+1
-            ByteBuffer buffer = addr.asByteBuffer();
-            while (buffer.hasRemaining()) {
-                System.out.printf("%02x ", buffer.get());
-            }
-            System.out.println();
             if ((int) api.connect.invokeExact(handle, addr, (int) addr.byteSize()) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call connect. " + error + " " + string);
+                getAndThrowException("connect");
             }
             MemorySegment utunNameLen = arena.allocate(ValueLayout.JAVA_INT);
             utunNameLen.set(ValueLayout.JAVA_INT, 0, 255);
             MemorySegment utunName = arena.allocate(255);
-            int UTUN_OPT_IFNAME = 2;
             if ((int) api.getsockopt.invokeExact(handle, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, utunName, utunNameLen) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call getsockopt. " + error + " " + string);
+                getAndThrowException("getsockopt");
             }
             this.deviceName = utunName.getString(0);
         } catch (IOException e) {
@@ -162,26 +139,12 @@ public class MacosNativeTunDevice implements TunDevice {
             MemorySegment ifr = arena.allocate(32);
             ifr.setString(0, deviceName);
             int handle;
-            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call socket. " + error + " " + string);
+            if ((handle = (int) api.socket.invokeExact(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                getAndThrowException("socket");
             }
-            int SIOCGIFFLAGS = (int) 3223349521L;
             if ((int) api.ioctl.invokeExact(handle, SIOCGIFFLAGS, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
-            short IFF_UP = 1;
             short flags = ifr.get(ValueLayout.JAVA_SHORT, 16);
             return (flags & IFF_UP) != 0;
         } catch (IOException e) {
@@ -197,38 +160,17 @@ public class MacosNativeTunDevice implements TunDevice {
             MemorySegment ifr = arena.allocate(32);
             ifr.setString(0, deviceName);
             int handle;
-            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call socket. " + error + " " + string);
+            if ((handle = (int) api.socket.invokeExact(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                getAndThrowException("socket");
             }
-            int SIOCGIFFLAGS = (int) 3223349521L;
             if ((int) api.ioctl.invokeExact(handle, SIOCGIFFLAGS, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
-            short IFF_UP = 1;
             short flags = ifr.get(ValueLayout.JAVA_SHORT, 16);
             flags = (short) (isUp ? flags | IFF_UP : flags & ~IFF_UP);
             ifr.set(ValueLayout.JAVA_SHORT, 16, flags);
-            int SIOCSIFFLAGS = (int) 2149607696L;
             if ((int) api.ioctl.invokeExact(handle, SIOCSIFFLAGS, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
         } catch (IOException e) {
             throw e;
@@ -243,36 +185,16 @@ public class MacosNativeTunDevice implements TunDevice {
             MemorySegment ifr = arena.allocate(32);
             ifr.setString(0, deviceName);
             int handle;
-            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call socket. " + error + " " + string);
+            if ((handle = (int) api.socket.invokeExact(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                getAndThrowException("socket");
             }
             ifr.set(ValueLayout.JAVA_BYTE, 17, (byte) 2);
-            int SIOCGIFADDR = (int) 3223349537L;
             if ((int) api.ioctl.invokeExact(handle, SIOCGIFADDR, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
             int address = ifr.get(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20);
-            int SIOCGIFNETMASK = (int) 3223349541L;
             if ((int) api.ioctl.invokeExact(handle, SIOCGIFNETMASK, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
             int mask = ifr.get(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20);
             InetAddress ipAddress = InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(address).array());
@@ -293,37 +215,17 @@ public class MacosNativeTunDevice implements TunDevice {
             MemorySegment ifr = arena.allocate(32);
             ifr.setString(0, deviceName);
             int handle;
-            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call socket. " + error + " " + string);
+            if ((handle = (int) api.socket.invokeExact(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                getAndThrowException("socket");
             }
             ifr.set(ValueLayout.JAVA_BYTE, 17, (byte) 2);
             ifr.set(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20, ByteBuffer.wrap(new byte[] {10, 0, 0, 1}).getInt());
-            int SIOCSIFADDR = (int) 2149607692L;
             if ((int) api.ioctl.invokeExact(handle, SIOCSIFADDR, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
             ifr.set(ValueLayout.JAVA_INT.withOrder(ByteOrder.BIG_ENDIAN), 20, ByteBuffer.wrap(new byte[] {(byte) 255, 0, 0, 0}).getInt());
-            int SIOCSIFNETMASK = (int) 2149607702L;
             if ((int) api.ioctl.invokeExact(handle, SIOCSIFNETMASK, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
         } catch (IOException e) {
             throw e;
@@ -338,24 +240,11 @@ public class MacosNativeTunDevice implements TunDevice {
             MemorySegment ifr = arena.allocate(32);
             ifr.setString(0, deviceName);
             int handle;
-            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call socket. " + error + " " + string);
+            if ((handle = (int) api.socket.invokeExact(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                getAndThrowException("socket");
             }
-            int SIOCGIFMTU = (int) 3223349555L;
             if ((int) api.ioctl.invokeExact(handle, SIOCGIFMTU, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
             int ifru_mtu = ifr.get(ValueLayout.JAVA_INT, 16);
             return ifru_mtu;
@@ -373,24 +262,11 @@ public class MacosNativeTunDevice implements TunDevice {
             ifr.setString(0, deviceName);
             ifr.set(ValueLayout.JAVA_INT, 16, mtu);
             int handle;
-            if ((handle = (int) api.socket.invokeExact(2, 2, 0)) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call socket. " + error + " " + string);
+            if ((handle = (int) api.socket.invokeExact(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                getAndThrowException("socket");
             }
-            int SIOCSIFMTU = (int) 2149607732L;
             if ((int) api.ioctl.invokeExact(handle, SIOCSIFMTU, ifr) == -1) {
-                MemorySegment p_error = (MemorySegment) api.error.invokeExact();
-                p_error = p_error.reinterpret(4);
-                int error = p_error.get(ValueLayout.JAVA_INT, 0);
-                MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
-                strerror = strerror.reinterpret(1000);
-                String string = strerror.getString(0);
-                throw new IOException("Failed to call ioctl. " + error + " " + string);
+                getAndThrowException("ioctl");
             }
         } catch (IOException e) {
             throw e;
@@ -407,5 +283,15 @@ public class MacosNativeTunDevice implements TunDevice {
     @Override
     public void setMacAddress(byte[] macAddress) throws IOException {
 
+    }
+
+    private void getAndThrowException(String function) throws Throwable {
+        MemorySegment p_error = (MemorySegment) api.error.invokeExact();
+        p_error = p_error.reinterpret(4);
+        int error = p_error.get(ValueLayout.JAVA_INT, 0);
+        MemorySegment strerror = (MemorySegment) api.strerror.invokeExact(error);
+        strerror = strerror.reinterpret(1000);
+        String string = strerror.getString(0);
+        throw new IOException("Failed to call " + function + ": " + error + " " + string);
     }
 }
