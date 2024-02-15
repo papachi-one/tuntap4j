@@ -29,16 +29,8 @@ public interface NetworkDevice {
 
     void setUp(boolean isUp) throws IOException;
 
-    InetAddress getInetAddress() throws IOException;
-
-    void setInetAddress(InetAddress inetAddress) throws IOException;
-
     int getMtu() throws IOException;
 
     void setMtu(int mtu) throws IOException;
-
-    byte[] getMacAddress() throws IOException;
-
-    void setMacAddress(byte[] macAddress) throws IOException;
 
 }
