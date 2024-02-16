@@ -19,11 +19,13 @@ public abstract class AbstractMacosNetworkDevice {
     protected static final int CTLIOCGINFO = (int) 3227799043L;
     protected static final int AF_SYSTEM = 32;
     protected static final int AF_INET = 2;
+    protected static final int AF_INET6 = 30;
     protected static final int AF_SYS_CONTROL = 2;
     protected static final int UTUN_OPT_IFNAME = 2;
     protected static final int SIOCGIFFLAGS = (int) 3223349521L;
     protected static final int SIOCSIFFLAGS = (int) 2149607696L;
     protected static final int IFF_UP = 1;
+    protected static final int SIOCAIFADDR = (int) 2151704858L;
     protected static final int SIOCGIFADDR = (int) 3223349537L;
     protected static final int SIOCSIFADDR = (int) 2149607692L;
     protected static final int SIOCGIFDSTADDR = (int) 3223349538L;
@@ -33,7 +35,6 @@ public abstract class AbstractMacosNetworkDevice {
     protected static final int SIOCGIFMTU = (int) 3223349555L;
     protected static final int SIOCSIFMTU = (int) 2149607732L;
     protected static final int O_RDWR = 2;
-
 
     protected NativeMacosApi api;
 

@@ -1,12 +1,11 @@
 package one.papachi.tuntap4j.ffm;
 
-import one.papachi.tuntap4j.api.TunDevice;
-
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.nio.ByteBuffer;
 
 public class MacosUTunDevice extends AbstractMacosTunDevice {
@@ -16,11 +15,10 @@ public class MacosUTunDevice extends AbstractMacosTunDevice {
         NativeMacosApi api = new NativeMacosApi();
         MacosUTunDevice tun = new MacosUTunDevice(api, deviceName);
         tun.open();
-        System.out.println(tun.isUp());
-        Thread.sleep(1000);
-        tun.setLocalAddress(Inet4Address.ofLiteral("10.0.0.1"));
-        tun.setRemoteAddress(Inet4Address.ofLiteral("10.0.0.2"));
-        System.out.println(tun.getLocalAddress() + " -> " + tun.getRemoteAddress());
+        tun.setTunnelAddresses(Inet4Address.ofLiteral("10.0.0.1"), Inet4Address.ofLiteral("10.0.0.2"));
+        tun.setTunnelAddresses(Inet4Address.ofLiteral("10.1.0.1"), Inet4Address.ofLiteral("10.1.0.2"));
+        tun.setTunnelAddresses(Inet6Address.ofLiteral("2001:da8:ecd1::1"), Inet6Address.ofLiteral("2001:da8:ecd1::2"));
+        tun.setTunnelAddresses(Inet6Address.ofLiteral("2001:da9:ecd1::1"), Inet6Address.ofLiteral("2001:da9:ecd1::2"));
         ByteBuffer dst = ByteBuffer.allocateDirect(1514);
         while (tun.read(dst.clear()) != -1) {
             dst.flip();

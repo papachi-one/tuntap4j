@@ -1,7 +1,6 @@
 package one.papachi.tuntap4j.api;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 

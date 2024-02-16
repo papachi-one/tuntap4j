@@ -1,23 +1,21 @@
 package one.papachi.tuntap4j.api;
 
 import java.io.IOException;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.List;
-import java.util.Map;
 
-public interface TunDevice extends NetworkDevice {
+public interface TunDevice extends NetworkDevice, TunnelAddressConfigurable {
 
     static List<TunDevice> getAvailableDevices() {
         return null;
     }
 
-    Inet4Address getLocalAddress() throws IOException;
+    InetAddress getLocalAddress() throws IOException;
 
-    Inet4Address getRemoteAddress() throws IOException;
+    InetAddress getRemoteAddress() throws IOException;
 
-    void setLocalAddress(Inet4Address localAddress) throws IOException;
+    void setLocalAddress(InetAddress localAddress) throws IOException;
 
-    void setRemoteAddress(Inet4Address remoteAddress) throws IOException;
+    void setRemoteAddress(InetAddress remoteAddress) throws IOException;
 
 }

@@ -2,8 +2,6 @@ package one.papachi.tuntap4j.ffm;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.VarHandle;
-import java.nio.ByteBuffer;
 
 import static java.lang.foreign.MemoryLayout.*;
 import static java.lang.foreign.ValueLayout.*;
@@ -19,6 +17,7 @@ public class NativeMacosApi {
     protected MethodHandle open;
     protected MethodHandle socket;
     protected MethodHandle ioctl;
+    protected MethodHandle ioctl1;
     protected MethodHandle connect;
     protected MethodHandle getsockopt;
     protected MethodHandle read;
@@ -73,6 +72,15 @@ public class NativeMacosApi {
                         JAVA_INT.withName("fd"),
                         JAVA_INT.withName("request"),
                         ADDRESS.withName("param")
+                ));
+
+        ioctl1 = linker.downcallHandle(lookup.find("ioctl").orElseThrow(),
+                FunctionDescriptor.of(
+                        JAVA_INT.withName("return"),
+                        JAVA_INT.withName("fd"),
+                        JAVA_INT.withName("request"),
+                        ADDRESS.withName("param"),
+                        JAVA_INT.withName("paramLen")
                 ));
 
         connect = linker.downcallHandle(lookup.find("connect").orElseThrow(),
