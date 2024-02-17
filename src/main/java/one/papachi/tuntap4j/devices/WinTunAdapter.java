@@ -1,4 +1,4 @@
-package one.papachi.tuntap4j.ffm;
+package one.papachi.tuntap4j.devices;
 
 import one.papachi.tuntap4j.api.TunDevice;
 

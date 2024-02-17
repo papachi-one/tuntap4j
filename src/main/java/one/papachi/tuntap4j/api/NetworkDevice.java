@@ -6,13 +6,13 @@ import java.util.List;
 
 public interface NetworkDevice {
 
-    public static List<TunDevice> getAvailableTunDevices() throws IOException {
-        return TunDevice.getAvailableDevices();
-    }
-
-    public static List<TapDevice> getAvailableTapDevices() throws IOException {
-        return TapDevice.getAvailableDevices();
-    }
+//    public static List<TunDevice> getAvailableTunDevices() throws IOException {
+//        return TunDevice.getAvailableDevices();
+//    }
+//
+//    public static List<TapDevice> getAvailableTapDevices() throws IOException {
+//        return TapDevice.getAvailableDevices();
+//    }
 
     boolean isOpen() throws IOException;
 

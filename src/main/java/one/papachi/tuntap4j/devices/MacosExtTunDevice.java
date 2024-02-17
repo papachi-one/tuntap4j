@@ -1,4 +1,6 @@
-package one.papachi.tuntap4j.ffm;
+package one.papachi.tuntap4j.devices;
+
+import one.papachi.tuntap4j.ffm.NativeMacosApi;
 
 import java.io.IOException;
 import java.lang.foreign.Arena;
@@ -32,8 +34,8 @@ public abstract class MacosExtTunDevice extends AbstractMacosTunDevice {
         try (Arena arena = Arena.ofConfined()) {
             String devicePath = "/dev/" + deviceName;
             MemorySegment pDevicePath = arena.allocateFrom(devicePath);
-            if ((handle = (int) api.open.invokeExact(pDevicePath, O_RDWR)) < 0)
-                getAndThrowException("open");
+            if ((handle = (int) api.open.invokeExact(pDevicePath, NativeMacosApi.O_RDWR)) < 0)
+                api.getAndThrowException("open");
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
