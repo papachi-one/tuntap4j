@@ -1,6 +1,7 @@
-package one.papachi.tuntap4j.ffm;
+package one.papachi.tuntap4j.devices;
 
 import one.papachi.tuntap4j.api.TapDevice;
+import one.papachi.tuntap4j.ffm.NativeWindowsApi;
 
 import java.io.IOException;
 import java.lang.foreign.Arena;
@@ -10,7 +11,7 @@ import java.nio.ByteBuffer;
 
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 
-public class TapV9Adapter implements TapDevice {
+public abstract class TapV9Adapter implements TapDevice {
 
 //    static final int TAP_WIN_IOCTL_GET_MAC = 2228228;
 //    static final int TAP_WIN_IOCTL_GET_VERSION = 2228232;
@@ -32,9 +33,11 @@ public class TapV9Adapter implements TapDevice {
     static final String TAP_WIN_SUFFIX = ".tap";
 
     public static void main(String[] args) throws Throwable {
-        String deviceName = USERMODEDEVICEDIR + "{584C682A-C1FC-45BB-AC18-F1E15841F499}" + TAP_WIN_SUFFIX;
-        NativeWindowsApi api = new NativeWindowsApi();
-        TapV9Adapter tap = new TapV9Adapter(api, deviceName);
+        String netCfgInstanceId = "{584C682A-C1FC-45BB-AC18-F1E15841F499}";
+        String deviceName = USERMODEDEVICEDIR + netCfgInstanceId + TAP_WIN_SUFFIX;
+        NativeWindowsApi api = null;
+//        TapV9Adapter tap = new TapV9Adapter(api, deviceName);
+        TapV9Adapter tap = null;
         tap.open();
         System.out.println("Registry MTU: " + tap.getMtuRegistry());
         System.out.println("   IOCTL MTU: " + tap.getMtu());
@@ -334,13 +337,6 @@ public class TapV9Adapter implements TapDevice {
 
     }
 
-    public byte[] getMacAddress() throws IOException {
-        return null;
-    }
-
-    public void setMacAddress(byte[] macAddress) throws IOException {
-
-    }
 
 
 }

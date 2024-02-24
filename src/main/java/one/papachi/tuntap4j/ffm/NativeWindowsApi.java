@@ -1,12 +1,161 @@
 package one.papachi.tuntap4j.ffm;
 
+import java.io.IOException;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
-import static java.lang.foreign.ValueLayout.ADDRESS;
-import static java.lang.foreign.ValueLayout.JAVA_INT;
+import static java.lang.foreign.ValueLayout.*;
 
 public class NativeWindowsApi {
+
+    static final String USERMODEDEVICEDIR = "\\\\.\\Global\\";
+    static final String TAP_WIN_SUFFIX = ".tap";
+    static final int TAP_WIN_IOCTL_SET_MEDIA_STATUS = 2228248;
+
+
+    public static void main(String[] args) throws Throwable {
+        Arena arena = Arena.global();
+        Linker linker = Linker.nativeLinker();
+        SymbolLookup lookup = linker.defaultLookup()
+                .or(SymbolLookup.libraryLookup("kernel32", arena))
+                .or(SymbolLookup.libraryLookup("combase", arena))
+                .or(SymbolLookup.libraryLookup("advapi32", arena))
+                .or(SymbolLookup.libraryLookup("iphlpapi", arena));
+
+        int ifIndex = getIfIndex(arena, linker, lookup, "{584C682A-C1FC-45BB-AC18-F1E15841F499}");
+
+        String netCfgInstanceId = "{584C682A-C1FC-45BB-AC18-F1E15841F499}";
+        String ifName = USERMODEDEVICEDIR + netCfgInstanceId + TAP_WIN_SUFFIX;
+
+        NativeWindowsApi api = new NativeWindowsApi();
+
+        MemorySegment lpFileName = arena.allocateFrom(ifName);
+        int dwDesiredAccess = 0x80000000 | 0x40000000;// GENERIC_READ | GENERIC_WRITE
+        int dwShareMode = 0;
+        MemorySegment lpSecurityAttributes = MemorySegment.NULL;
+        int dwCreationDisposition = 3;// OPEN_EXISTING
+        int dwFlagsAndAttributes = 0x00000004;// FILE_ATTRIBUTE_SYSTEM
+        MemorySegment hTemplateFile = MemorySegment.NULL;
+        int handle = api.CreateFileA(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+        if (handle == -1) {
+            int error = api.GetLastError();
+            if (error != 0) {
+                MemorySegment message = arena.allocate(10000L);
+                int res = api.FormatMessageA(0x1000, MemorySegment.NULL, error, 0, message, (int) message.byteSize(), MemorySegment.NULL);
+                if (res != 0) {
+                    String string = message.getString(0);
+                    System.out.println(string);
+                }
+                System.out.println(error);
+            }
+
+        }
+
+        MemorySegment lpInBuffer = arena.allocateFrom(JAVA_INT, 1);
+        int nInOutBufferSize = (int) lpInBuffer.byteSize();
+        int nOutBufferSize = nInOutBufferSize;
+        MemorySegment lpBytesReturned = arena.allocateFrom(JAVA_INT, 0);
+        MemorySegment lpOverlapped = MemorySegment.NULL;
+        int result = api.DeviceIoControl(MemorySegment.ofAddress(handle), TAP_WIN_IOCTL_SET_MEDIA_STATUS, lpInBuffer, nInOutBufferSize, lpInBuffer, nOutBufferSize, lpBytesReturned, lpOverlapped);
+        if (result == 0) {
+            int error = api.GetLastError();
+            if (error != 0) {
+                MemorySegment message = arena.allocate(10000L);
+                int res = api.FormatMessageA(0x1000, MemorySegment.NULL, error, 0, message, (int) message.byteSize(), MemorySegment.NULL);
+                if (res != 0) {
+                    String string = message.getString(0);
+                    System.out.println(string);
+                }
+                System.out.println(error);
+            }
+        }
+
+        MethodHandle GetUnicastIpAddressTable = linker.downcallHandle(lookup.find("GetUnicastIpAddressTable").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS));
+
+
+
+        addAddress(api, arena, linker, lookup, ifIndex);
+        Thread.sleep(100000);
+    }
+
+    static int getIfIndex(Arena arena, Linker linker, SymbolLookup lookup, String netCfgInstanceId) throws Throwable {
+        MethodHandle CLSIDFromString = linker.downcallHandle(lookup.find("CLSIDFromString").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
+        MethodHandle ConvertInterfaceGuidToLuid = linker.downcallHandle(lookup.find("ConvertInterfaceGuidToLuid").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
+        MethodHandle ConvertInterfaceLuidToIndex = linker.downcallHandle(lookup.find("ConvertInterfaceLuidToIndex").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
+
+        MemorySegment guidString = arena.allocateFrom(ValueLayout.JAVA_CHAR, netCfgInstanceId.toCharArray());
+        MemorySegment InterfaceGuid = arena.allocate(16);
+        MemorySegment InterfaceLuid = arena.allocateFrom(JAVA_LONG, 0);
+        MemorySegment netIfIndex = arena.allocateFrom(JAVA_INT, 0);
+
+        int result;
+        result = (int) CLSIDFromString.invokeExact(guidString, InterfaceGuid);
+        result = (int) ConvertInterfaceGuidToLuid.invokeExact(InterfaceGuid, InterfaceLuid);
+        result = (int) ConvertInterfaceLuidToIndex.invokeExact(InterfaceLuid, netIfIndex);
+
+        return netIfIndex.get(JAVA_INT, 0);
+    }
+
+    static void addAddress(NativeWindowsApi api, Arena arena, Linker linker, SymbolLookup lookup, int ifIndex) throws Throwable {
+        MethodHandle AddIPAddress = linker.downcallHandle(lookup.find("AddIPAddress").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS, ADDRESS));
+
+        {
+            int address = ByteBuffer.wrap(InetAddress.ofLiteral("10.5.0.1").getAddress()).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            int mask = ByteBuffer.wrap(InetAddress.ofLiteral("255.255.0.0").getAddress()).order(ByteOrder.LITTLE_ENDIAN).getInt();
+            MemorySegment NTEContext  = arena.allocateFrom(JAVA_INT, 0);
+            MemorySegment NTEInstance = arena.allocateFrom(JAVA_INT, 0);
+
+            int result = (int) AddIPAddress.invokeExact(address, mask, ifIndex, NTEContext, NTEInstance);
+
+            System.out.println(NTEContext.get(JAVA_INT, 0));
+            System.out.println(NTEInstance.get(JAVA_INT, 0));
+
+        }
+
+        int address = ByteBuffer.wrap(InetAddress.ofLiteral("10.6.0.1").getAddress()).order(ByteOrder.LITTLE_ENDIAN).getInt();
+        int mask = ByteBuffer.wrap(InetAddress.ofLiteral("255.255.0.0").getAddress()).order(ByteOrder.LITTLE_ENDIAN).getInt();
+        MemorySegment NTEContext  = arena.allocateFrom(JAVA_INT, 0);
+        MemorySegment NTEInstance = arena.allocateFrom(JAVA_INT, 0);
+
+        int result = (int) AddIPAddress.invokeExact(address, mask, ifIndex, NTEContext, NTEInstance);
+
+        System.out.println(NTEContext.get(JAVA_INT, 0));
+        System.out.println(NTEInstance.get(JAVA_INT, 0));
+
+
+        System.out.println(result);
+
+
+
+        MethodHandle FormatMessageA = linker.downcallHandle(lookup.find("FormatMessageA").orElseThrow(),
+                FunctionDescriptor.of(
+                        JAVA_INT.withName("return"),
+                        JAVA_INT.withName("dwFlags"),
+                        ADDRESS.withName("lpSource"),
+                        JAVA_INT.withName("dwMessageId"),
+                        JAVA_INT.withName("dwLanguageId"),
+                        ADDRESS.withName("lpBuffer"),
+                        JAVA_INT.withName("nSize"),
+                        ADDRESS.withName("Arguments")
+                ));
+
+        MemorySegment message = arena.allocate(10000L);
+        int i = (int) FormatMessageA.invokeExact(0x1000, MemorySegment.NULL, result, 0, message, (int) message.byteSize(), MemorySegment.NULL);
+        String string = message.getString(0);
+        System.out.println(string);
+    }
+
 
     protected Arena arena;
     protected Linker linker;
@@ -160,6 +309,11 @@ public class NativeWindowsApi {
                         ADDRESS.withName("lpData"),
                         JAVA_INT.withName("cbData")
                 ));
+
+        AddIPAddress = linker.downcallHandle(lookup.find("AddIPAddress").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS, ADDRESS));
+        DeleteIPAddress = linker.downcallHandle(lookup.find("DeleteIPAddress").orElseThrow(),
+                FunctionDescriptor.of(JAVA_INT, JAVA_INT));
     }
 
     MethodHandle RegOpenKeyA;
@@ -169,6 +323,8 @@ public class NativeWindowsApi {
     MethodHandle RegEnumKeyA;
     MethodHandle RegGetValueA;
     MethodHandle RegSetValueExA;
+    public MethodHandle AddIPAddress;
+    public MethodHandle DeleteIPAddress;
 
     public int RegOpenKeyA(MemorySegment hKey, MemorySegment lpSubKey, MemorySegment phkResult) throws Throwable {
         return (int) RegOpenKeyA.invokeExact(hKey, lpSubKey, phkResult);
