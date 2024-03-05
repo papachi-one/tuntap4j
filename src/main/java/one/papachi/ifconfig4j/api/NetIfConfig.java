@@ -2,10 +2,14 @@ package one.papachi.ifconfig4j.api;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.VarHandle;
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.stream.Collector;
 
-import static java.lang.foreign.MemoryLayout.*;
 import static java.lang.foreign.ValueLayout.*;
 
 public interface NetIfConfig {
@@ -13,25 +17,69 @@ public interface NetIfConfig {
     record NetIf(String name) {
     }
 
-    record NetIfAddress(InetAddress address, int prefixLength) {
+    record NetAddress(InetAddress address, int prefixLength) {
     }
 
-    void getNetIfList();
-
-    void getNetIfAddressList();
-
-    void addNetIfAddress(NetIf netIf, NetIfAddress netIfAddress);
-
-    void removeNetIfAddress(NetIf netIf, NetIfAddress netIfAddress);
-
-    record NetRoute() {
+    record NetP2PAddress(NetAddress local, InetAddress remote) {
+        public NetP2PAddress(InetAddress address, int prefixLength, InetAddress remote) {
+            this(new NetAddress(address, prefixLength), remote);
+        }
     }
 
-    void getNetRoutes();
+    record NetIfAddress(NetIf netIf, NetAddress netAddress) {
+        public NetIfAddress(NetIf netIf, InetAddress address, int prefixLength) {
+            this(netIf, new NetAddress(address, prefixLength));
+        }
+    }
 
-    void addNetRoute();
+    record NetIfP2PAddress(NetIf netIf, NetP2PAddress addresses) {
+        public NetIfP2PAddress(NetIf netIf, NetAddress local, InetAddress remote) {
+            this(netIf, new NetP2PAddress(local, remote));
+        }
+        public NetIfP2PAddress(NetIf netIf, InetAddress local, int prefixLength, InetAddress remote) {
+            this(netIf, new NetP2PAddress(new NetAddress(local, prefixLength), remote));
+        }
+    }
 
-    void removeNetRoute();
+    record NetRoute(NetIf netIf, NetAddress destination, InetAddress gateway) {
+        public NetRoute(NetAddress destination, InetAddress gateway) {
+            this(null, destination, gateway);
+        }
+    }
+
+    List<NetIf> getNetIfList();
+
+    List<NetIfAddress> getNetIfAddressList();
+
+    default Map<NetIf, List<NetAddress>> getNetIfAddressMap() {
+        return getNetIfAddressList()
+                .stream()
+                .collect(Collector
+                        .of(HashMap::new, (map, e) -> map.compute(e.netIf, (_, value) -> {
+                            value = value != null ? value : new ArrayList<>();
+                            value.add(e.netAddress);
+                            return value;
+                        }), (a, b) -> {
+                            b.forEach((key1, value1) -> a.compute(key1, (_, value) -> {
+                                value = value != null ? value : new ArrayList<>();
+                                value.addAll(value1);
+                                return value;
+                            }));
+                            return a;
+                        }));
+    }
+
+    List<NetAddress> getNetAddressList(NetIf netIf);
+
+    boolean addNetIfAddress(NetIfAddress netIfAddress);
+
+    boolean removeNetIfAddress(NetIfAddress netIfAddress);
+
+    List<NetRoute> getNetRouteList();
+
+    boolean addNetRoute(NetRoute netRoute);
+
+    boolean removeNetRoute(NetRoute NetRoute);
 
 
     class WindowsNetApi {

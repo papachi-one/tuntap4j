@@ -14,95 +14,95 @@ public class MIB_UNICASTIPADDRESS_ROW {
         this.pointer = pointer;
     }
 
-    public SOCKADDR_INET getAddress() {
+    public SOCKADDR_INET Address() {
         return new SOCKADDR_INET(pointer.asSlice(0, 28));
     }
 
-    public long getInterfaceLuid() {
+    public long InterfaceLuid() {
         return pointer.get(JAVA_LONG, 32);
     }
 
-    public int getInterfaceIndex() {
+    public int InterfaceIndex() {
         return pointer.get(JAVA_INT, 40);
     }
 
-    public int getPrefixOrigin() {
+    public int PrefixOrigin() {
         return pointer.get(JAVA_INT, 44);
     }
 
-    public int getSuffixOrigin() {
+    public int SuffixOrigin() {
         return pointer.get(JAVA_INT, 48);
     }
 
-    public int getValidLifetime() {
+    public int ValidLifetime() {
         return pointer.get(JAVA_INT, 52);
     }
 
-    public int getPreferredLifetime() {
+    public int PreferredLifetime() {
         return pointer.get(JAVA_INT, 56);
     }
 
-    public int getOnLinkPrefixLength() {
+    public int OnLinkPrefixLength() {
         return pointer.get(JAVA_BYTE, 60) & 0xFF;
     }
 
-    public int getSkipAsSource() {
+    public int SkipAsSource() {
         return pointer.get(JAVA_BYTE, 61);
     }
 
-    public int getDadState() {
+    public int DadState() {
         return pointer.get(JAVA_INT, 64);
     }
 
-    public int getScopeId() {
+    public int ScopeId() {
         return pointer.get(JAVA_INT, 68);
     }
 
-    public long getCreationTimeStamp() {
+    public long CreationTimeStamp() {
         return pointer.get(JAVA_LONG, 72);
     }
 
-    public void setInterfaceLuid(long interfaceLuid) {
+    public void InterfaceLuid(long interfaceLuid) {
         pointer.set(JAVA_LONG, 32, interfaceLuid);
     }
 
-    public void setInterfaceIndex(int interfaceIndex) {
+    public void InterfaceIndex(int interfaceIndex) {
         pointer.set(JAVA_INT, 40, interfaceIndex);
     }
 
-    public void setPrefixOrigin(int prefixOrigin) {
+    public void PrefixOrigin(int prefixOrigin) {
         pointer.set(JAVA_INT, 44, prefixOrigin);
     }
 
-    public void setSuffixOrigin(int suffixOrigin) {
+    public void SuffixOrigin(int suffixOrigin) {
         pointer.set(JAVA_INT, 48, suffixOrigin);
     }
 
-    public void setValidLifetime(int validLifetime) {
+    public void ValidLifetime(int validLifetime) {
         pointer.set(JAVA_INT, 52, validLifetime);
     }
 
-    public void setPreferredLifetime(int preferredLifetime) {
+    public void PreferredLifetime(int preferredLifetime) {
         pointer.set(JAVA_INT, 56, preferredLifetime);
     }
 
-    public void setOnLinkPrefixLength(int onLinkPrefixLength) {
+    public void OnLinkPrefixLength(int onLinkPrefixLength) {
         pointer.set(JAVA_BYTE, 60, (byte) onLinkPrefixLength);
     }
 
-    public void setSkipAsSource(int skipAsSource) {
+    public void SkipAsSource(int skipAsSource) {
         pointer.set(JAVA_BYTE, 61, (byte) skipAsSource);
     }
 
-    public void setDadState(int dadState) {
+    public void DadState(int dadState) {
         pointer.set(JAVA_INT, 64, dadState);
     }
 
-    public void setScopeId(int scopeId) {
+    public void ScopeId(int scopeId) {
         pointer.set(JAVA_INT, 68, scopeId);
     }
 
-    public void setCreationTimeStamp(long creationTimeStamp) {
+    public void CreationTimeStamp(long creationTimeStamp) {
         pointer.set(JAVA_LONG, 72, creationTimeStamp);
     }
 

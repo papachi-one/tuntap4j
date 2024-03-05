@@ -242,12 +242,12 @@ public class WindowsNetApi {
         if (true) {
             MemorySegment pointer = arena.allocate(MIB_UNICASTIPADDRESS_ROW);
             one.papachi.ifconfig4j.ffm.amd64.windows.MIB_UNICASTIPADDRESS_ROW row = new MIB_UNICASTIPADDRESS_ROW(pointer);
-            row.setInterfaceIndex(11);
-            row.getAddress().Ipv4().setSinFamily(2);
-            row.getAddress().Ipv4().setSinAddr(InetAddress.ofLiteral("10.0.0.2").getAddress());
-            row.setPreferredLifetime(Integer.MAX_VALUE);
-            row.setValidLifetime(Integer.MAX_VALUE);
-            row.setOnLinkPrefixLength(16);
+            row.InterfaceIndex(11);
+            row.Address().Ipv4().sin_family(2);
+            row.Address().Ipv4().sin_addr(InetAddress.ofLiteral("10.0.0.2").getAddress());
+            row.PreferredLifetime(Integer.MAX_VALUE);
+            row.ValidLifetime(Integer.MAX_VALUE);
+            row.OnLinkPrefixLength(16);
             int returnValue = (int) CreateUnicastIpAddressEntry.invokeExact(pointer);
             System.out.println(returnValue);
         }
@@ -260,11 +260,11 @@ public class WindowsNetApi {
             table = table.asSlice(8);
             for (int i = 0; i < NumOfEntries; i++) {
                 one.papachi.ifconfig4j.ffm.amd64.windows.MIB_UNICASTIPADDRESS_ROW row = new MIB_UNICASTIPADDRESS_ROW(table.asSlice(i * 80L, 80));
-                if (row.getInterfaceIndex() != 11)
+                if (row.InterfaceIndex() != 11)
                     continue;
-                int sin_family = row.getAddress().Ipv4().sin_family();
-                InetAddress inetAddress = InetAddress.getByAddress(sin_family == 2 ? row.getAddress().Ipv4().sin_addr() : row.getAddress().Ipv6().sin6_addr());
-                System.out.println("InterfaceIndex = " + row.getInterfaceIndex() + ": InetAddress = " + inetAddress.getHostAddress() + "/" + row.getOnLinkPrefixLength());
+                int sin_family = row.Address().Ipv4().sin_family();
+                InetAddress inetAddress = InetAddress.getByAddress(sin_family == 2 ? row.Address().Ipv4().sin_addr() : row.Address().Ipv6().sin6_addr());
+                System.out.println("InterfaceIndex = " + row.InterfaceIndex() + ": InetAddress = " + inetAddress.getHostAddress() + "/" + row.OnLinkPrefixLength());
                 if (inetAddress.getHostAddress().startsWith("169.254.")) {
 //                    returnValue = (int) DeleteUnicastIpAddressEntry.invokeExact(table.asSlice(i * 80L, 80));
 //                    System.out.println(returnValue);

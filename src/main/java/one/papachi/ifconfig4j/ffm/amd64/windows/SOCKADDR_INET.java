@@ -26,7 +26,7 @@ public class SOCKADDR_INET {
         return pointer.get(JAVA_SHORT, 0);
     }
 
-    public void setSiFamily(int si_family) {
+    public void si_family(int si_family) {
         pointer.set(JAVA_SHORT, 0, (short) si_family);
     }
 

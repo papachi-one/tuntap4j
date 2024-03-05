@@ -34,23 +34,23 @@ public class SOCKADDR_IN6 {
         return pointer.get(JAVA_INT, 24);
     }
 
-    public void setSin6Family(int sin6_family) {
+    public void sin6_family(int sin6_family) {
         pointer.set(JAVA_SHORT, 0, (short) sin6_family);
     }
 
-    public void setSin6Port(int sin6_port) {
+    public void sin6_port(int sin6_port) {
         pointer.set(JAVA_INT, 2, (short) sin6_port);
     }
 
-    public void setSin6Flowinfo(int sin6_flowinfo) {
+    public void sin6_flowinfo(int sin6_flowinfo) {
         pointer.set(JAVA_INT, 4, (short) sin6_flowinfo);
     }
 
-    public void setSin6Addr(byte[] sin6_addr) {
+    public void sin6_addr(byte[] sin6_addr) {
         pointer.asByteBuffer().put(8, sin6_addr);
     }
 
-    public void setSin6Scope(int sin6_scope_id) {
+    public void sin6_scope_id(int sin6_scope_id) {
         pointer.set(JAVA_INT, 24, sin6_scope_id);
     }
 

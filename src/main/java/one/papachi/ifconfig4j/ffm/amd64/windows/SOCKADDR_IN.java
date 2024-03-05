@@ -28,15 +28,15 @@ public class SOCKADDR_IN {
         return sin_addr;
     }
 
-    public void setSinFamily(int sin_family) {
+    public void sin_family(int sin_family) {
         pointer.set(JAVA_SHORT, 0, (short) sin_family);
     }
 
-    public void setSinPort(int sin_port) {
+    public void sin_port(int sin_port) {
         pointer.set(JAVA_SHORT, 2, (short) sin_port);
     }
 
-    public void setSinAddr(byte[] sin_addr) {
+    public void sin_addr(byte[] sin_addr) {
         pointer.asByteBuffer().put(4, sin_addr);
     }
 
