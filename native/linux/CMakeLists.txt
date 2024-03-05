@@ -1,7 +1,0 @@
-cmake_minimum_required(VERSION 3.17)
-project(tuntap4j C)
-set(CMAKE_C_STANDARD 99)
-add_library(tuntap4j SHARED one_papachi_tuntap4j_NetworkDevice.c one_papachi_tuntap4j_NetworkDevice.h)
-include_directories(./)
-include_directories("$ENV{JAVA_HOME}/include")
-include_directories("$ENV{JAVA_HOME}/include/linux")
